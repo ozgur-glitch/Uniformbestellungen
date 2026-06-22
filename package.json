@@ -5,8 +5,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
-    "ts.check": "tsc"
+    "web": "expo start --web"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "~1.23.1",
@@ -20,4 +19,3 @@
   },
   "private": true
 }
-
