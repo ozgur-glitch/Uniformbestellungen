@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Uniformbestellungen",
+    "slug": "uniformbestellungen",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.ozgcet.uniformbestellungen"
+    },
+    "web": {
+      "favicon": "./icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2331d326-8b24-4309-9eeb-1970c0d70800"
+      }
+    },
+    "owner": "ozgcet"
+  }
+}
