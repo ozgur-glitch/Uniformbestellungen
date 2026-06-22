@@ -9,19 +9,18 @@ import {
   SafeAreaView, 
   Alert,
   Keyboard,
-  ScrollView
+  ScrollView,
+  StatusBar
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StatusBar } from 'expo-status-bar';
 
 const STORAGE_KEY = '@uniform_orders_key';
 
 export default function App() {
   // Formular-States
   const [name, setName] = useState('');
-  const [date, setDate] = useState(new Date().toLocaleDateString('de-DE'));
-  const [type, setType] = useState('');
-  const [size, setSize] = useState('');
+  const [dateInput, setDateInput] = useState(''); // Startet immer komplett leer
+  const [editingId, setEditingId] = useState(null); // ID der Bestellung, die bearbeitet wird
   
   // App-Daten-States
   const [orders, setOrders] = useState([]);
@@ -49,35 +48,78 @@ export default function App() {
     }
   };
 
+  // Hilfsfunktion zur Umwandlung von TTMMJJ in TT.MM.JJJJ
+  const formatDisplayDate = (input) => {
+    const cleaned = input.replace(/\D/g, '');
+    if (cleaned.length !== 6) return input;
+    
+    const day = cleaned.substring(0, 2);
+    const month = cleaned.substring(2, 4);
+    const yearShort = cleaned.substring(4, 6);
+    
+    const yearCurrentShort = new Date().getFullYear() % 100;
+    const century = parseInt(yearShort) <= yearCurrentShort + 10 ? '20' : '19';
+    
+    return `${day}.${month}.${century}${yearShort}`;
+  };
+
   const saveOrder = async () => {
-    if (!name.trim() || !date.trim() || !type.trim() || !size.trim()) {
+    if (!name.trim() || !dateInput.trim()) {
       Alert.alert('Fehler', 'Bitte fülle alle Felder aus.');
       return;
     }
 
-    const newOrder = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      date: date.trim(),
-      type: type.trim(),
-      size: size.trim()
-    };
+    if (dateInput.replace(/\D/g, '').length !== 6) {
+      Alert.alert('Fehler', 'Das Datum muss im Format TTMMJJ eingegeben werden (z.B. 220626).');
+      return;
+    }
 
-    const updatedOrders = [newOrder, ...orders];
+    const formattedDate = formatDisplayDate(dateInput);
+
+    let updatedOrders;
+
+    if (editingId) {
+      updatedOrders = orders.map(order => {
+        if (order.id === editingId) {
+          return { ...order, name: name.trim(), date: formattedDate };
+        }
+        return order;
+      });
+      setEditingId(null);
+    } else {
+      const newOrder = {
+        id: Date.now().toString(),
+        name: name.trim(),
+        date: formattedDate
+      };
+      updatedOrders = [newOrder, ...orders];
+    }
     
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedOrders));
       setOrders(updatedOrders);
       
-      // Reset Form (Datum bleibt für schnelle Folgebuchungen stehen)
       setName('');
-      setType('');
-      setSize('');
+      setDateInput(''); // Leert das Datumsfeld nach dem Speichern wieder
       Keyboard.dismiss();
-      Alert.alert('Erfolg', 'Bestellung wurde registriert!');
+      Alert.alert('Erfolg', editingId ? 'Bestellung aktualisiert!' : 'Bestellung wurde registriert!');
     } catch (error) {
       Alert.alert('Fehler', 'Speichern fehlgeschlagen.');
     }
+  };
+
+  const startEditOrder = (order) => {
+    setName(order.name);
+    const rawDate = order.date.replace(/\./g, '');
+    if (rawDate.length === 8) {
+      const dd = rawDate.substring(0, 2);
+      const mm = rawDate.substring(2, 4);
+      const yy = rawDate.substring(6, 8);
+      setDateInput(`${dd}${mm}${yy}`);
+    } else {
+      setDateInput(rawDate);
+    }
+    setEditingId(order.id);
   };
 
   const deleteOrder = async (id) => {
@@ -85,12 +127,17 @@ export default function App() {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filteredOrders));
       setOrders(filteredOrders);
+      if (editingId === id) {
+        setEditingId(null);
+        setName('');
+        setDateInput('');
+      }
     } catch (error) {
       Alert.alert('Fehler', 'Löschen fehlgeschlagen.');
     }
   };
 
-  // --- BACKUP FUNKTIONEN (Ohne Clipboard-Automatik) ---
+  // --- BACKUP FUNKTIONEN ---
   const generateBackupString = () => {
     if (orders.length === 0) {
       Alert.alert('Hinweis', 'Keine Daten zum Exportieren vorhanden.');
@@ -143,14 +190,12 @@ export default function App() {
   // --- FILTER & SORTIERUNG BESTELLUNGEN ---
   const getFilteredAndSortedOrders = () => {
     let result = orders.filter(order => 
-      order.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.type.toLowerCase().includes(searchQuery.toLowerCase())
+      order.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     if (orderSortField === 'name') {
       return result.sort((a, b) => a.name.localeCompare(b.name));
     } else {
-      // Sortierung nach Datum (Neueste zuerst)
       return result.sort((a, b) => b.date.localeCompare(a.date));
     }
   };
@@ -164,14 +209,15 @@ export default function App() {
     inputBg: darkMode ? '#2d2d2d' : '#fafafa',
     inputBorder: darkMode ? '#444444' : '#cccccc',
     headerBg: darkMode ? '#1a1a1a' : '#003366',
-    navBtnActive: darkMode ? '#444444' : '#002244'
+    navBtnActive: darkMode ? '#444444' : '#002244',
+    statNumber: darkMode ? '#3b82f6' : '#003366' // Dynamische Farbe für besseren Darkmode-Kontrast
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
-      <StatusBar style={darkMode ? 'light' : 'dark'} />
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={theme.headerBg} />
       
-      {/* Header mit Darkmode Schalter */}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.headerBg }]}>
         <Text style={styles.headerTitle}>Uniformen Verwaltung</Text>
         <TouchableOpacity 
@@ -186,7 +232,7 @@ export default function App() {
       <View style={styles.tabBar}>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'orders' && { backgroundColor: theme.navBtnActive }]} 
-          onPress={() => setActiveTab('orders')}
+          onPress={() => { setActiveTab('orders'); }}
         >
           <Text style={styles.tabText}>Bestellungen</Text>
         </TouchableOpacity>
@@ -213,7 +259,9 @@ export default function App() {
             <View>
               {/* Formular */}
               <View style={[styles.card, { backgroundColor: theme.card }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Neue Bestellung</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  {editingId ? 'Bestellung bearbeiten' : 'Neue Bestellung'}
+                </Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
                   placeholder="Mitarbeiter Name"
@@ -223,35 +271,33 @@ export default function App() {
                 />
                 <TextInput
                   style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                  placeholder="Bestelldatum (z.B. 22.06.2026)"
+                  placeholder="Bestelldatum (Format: TTMMJJ, z.B. 220626)"
                   placeholderTextColor={theme.subText}
-                  value={date}
-                  onChangeText={setDate}
+                  keyboardType="numeric"
+                  maxLength={6}
+                  value={dateInput}
+                  onChangeText={setDateInput}
                 />
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                  placeholder="Uniform-Typ (z.B. Hose)"
-                  placeholderTextColor={theme.subText}
-                  value={type}
-                  onChangeText={setType}
-                />
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                  placeholder="Größe (z.B. XL)"
-                  placeholderTextColor={theme.subText}
-                  value={size}
-                  onChangeText={setSize}
-                />
-                <TouchableOpacity style={styles.button} onPress={saveOrder}>
-                  <Text style={styles.buttonText}>Hinzufügen</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity style={[styles.button, { flex: 1 }]} onPress={saveOrder}>
+                    <Text style={styles.buttonText}>{editingId ? 'Speichern' : 'Hinzufügen'}</Text>
+                  </TouchableOpacity>
+                  {editingId && (
+                    <TouchableOpacity 
+                      style={[styles.button, { backgroundColor: '#6c757d' }]} 
+                      onPress={() => { setEditingId(null); setName(''); setDateInput(''); }}
+                    >
+                      <Text style={styles.buttonText}>Abbrechen</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               {/* Suche und Sortierung */}
               <View style={[styles.card, { backgroundColor: theme.card }]}>
                 <TextInput
                   style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                  placeholder="🔍 Namen oder Typ suchen..."
+                  placeholder="🔍 Namen suchen..."
                   placeholderTextColor={theme.subText}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -278,12 +324,16 @@ export default function App() {
             <View style={[styles.orderCard, { backgroundColor: theme.card }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.orderTextBold, { color: theme.text }]}>{item.name}</Text>
-                <Text style={[styles.orderText, { color: theme.subText }]}>{item.type} (Gr. {item.size})</Text>
                 <Text style={[styles.dateText, { color: theme.subText }]}>Datum: {item.date}</Text>
               </View>
-              <TouchableOpacity style={styles.deleteButton} onPress={() => deleteOrder(item.id)}>
-                <Text style={styles.deleteButtonText}>X</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity style={styles.editButton} onPress={() => startEditOrder(item)}>
+                  <Text style={styles.editButtonText}>✏️</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteButton} onPress={() => deleteOrder(item.id)}>
+                  <Text style={styles.deleteButtonText}>X</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           ListEmptyComponent={
@@ -317,10 +367,14 @@ export default function App() {
             data={getStatistics()}
             keyExtractor={(item) => item.name}
             renderItem={({ item }) => (
-              <View style={[styles.orderCard, { backgroundColor: theme.card }]}>
-                <Text style={[styles.orderTextBold, { color: theme.text }]}>{item.name}</Text>
-                <Text style={[styles.orderTextBold, { color: '#003366', fontWeight: 'bold' }]}>
-                  {item.count} {item.count === 1 ? 'Bestellung' : 'Bestellungen'}
+              <View style={[styles.orderCard, { backgroundColor: theme.card, flexDirection: 'row' }]}>
+                {/* Name links fixiert */}
+                <Text style={[styles.orderTextBold, { color: theme.text, flex: 1 }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                {/* Dynamische Farbanpassung für perfekten Darkmode-Kontrast */}
+                <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 60, textAlign: 'right' }]}>
+                  {item.count}
                 </Text>
               </View>
             )}
@@ -471,8 +525,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   dateText: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 4,
+  },
+  editButton: {
+    backgroundColor: '#ffc107',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editButtonText: {
+    fontSize: 14,
   },
   deleteButton: {
     backgroundColor: '#dc3545',
