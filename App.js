@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -20,13 +21,20 @@ export default function App() {
   // Formular-States
   const [name, setName] = useState('');
   const [dateInput, setDateInput] = useState(''); // Startet immer komplett leer
+  const [quantity, setQuantity] = useState(''); // Neues State für die Anzahl der bestellten Stückzahlen
   const [editingId, setEditingId] = useState(null); // ID der Bestellung, die bearbeitet wird
   
+  // Ref für den automatischen Fokuswechsel
+  const quantityInputRef = useRef(null);
+
   // App-Daten-States
   const [orders, setOrders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [orderSortField, setOrderSortField] = useState('date'); // 'name' oder 'date'
-  const [statSortField, setStatSortField] = useState('count'); // 'name' oder 'count'
+  
+  // Neue Sortier-States für Statistiken (Spaltenklick, Auf-/Absteigend)
+  const [statSortField, setStatSortField] = useState('name'); // 'name', 'count', oder 'totalQuantity'
+  const [statSortDirection, setStatSortDirection] = useState('asc'); // 'asc' oder 'desc'
   
   // UI-States
   const [darkMode, setDarkMode] = useState(false);
@@ -63,8 +71,18 @@ export default function App() {
     return `${day}.${month}.${century}${yearShort}`;
   };
 
+  // Überwachung der Datumseingabe für den automatischen Wechsel
+  const handleDateChange = (text) => {
+    setDateInput(text);
+    const cleaned = text.replace(/\D/g, '');
+    if (cleaned.length === 6) {
+      // Wenn 6 Zahlen erreicht sind, fokussiere das Stückzahlen-Feld
+      quantityInputRef.current?.focus();
+    }
+  };
+
   const saveOrder = async () => {
-    if (!name.trim() || !dateInput.trim()) {
+    if (!name.trim() || !dateInput.trim() || !quantity.trim()) {
       Alert.alert('Fehler', 'Bitte fülle alle Felder aus.');
       return;
     }
@@ -81,7 +99,7 @@ export default function App() {
     if (editingId) {
       updatedOrders = orders.map(order => {
         if (order.id === editingId) {
-          return { ...order, name: name.trim(), date: formattedDate };
+          return { ...order, name: name.trim(), date: formattedDate, quantity: quantity.trim() };
         }
         return order;
       });
@@ -90,7 +108,8 @@ export default function App() {
       const newOrder = {
         id: Date.now().toString(),
         name: name.trim(),
-        date: formattedDate
+        date: formattedDate,
+        quantity: quantity.trim()
       };
       updatedOrders = [newOrder, ...orders];
     }
@@ -101,6 +120,7 @@ export default function App() {
       
       setName('');
       setDateInput(''); // Leert das Datumsfeld nach dem Speichern wieder
+      setQuantity('');  // Leert das Stückzahlfeld nach dem Speichern wieder
       Keyboard.dismiss();
       Alert.alert('Erfolg', editingId ? 'Bestellung aktualisiert!' : 'Bestellung wurde registriert!');
     } catch (error) {
@@ -110,6 +130,7 @@ export default function App() {
 
   const startEditOrder = (order) => {
     setName(order.name);
+    setQuantity(order.quantity ? order.quantity : '1'); // Fallback für bestehende Altdaten ohne Quantity
     const rawDate = order.date.replace(/\./g, '');
     if (rawDate.length === 8) {
       const dd = rawDate.substring(0, 2);
@@ -131,6 +152,7 @@ export default function App() {
         setEditingId(null);
         setName('');
         setDateInput('');
+        setQuantity('');
       }
     } catch (error) {
       Alert.alert('Fehler', 'Löschen fehlgeschlagen.');
@@ -167,24 +189,48 @@ export default function App() {
     }
   };
 
-  // --- STATISTIK GENERIEREN ---
+  // --- STATISTIK GENERIEREN UND SORTIEREN ---
+  const handleStatHeaderPress = (field) => {
+    if (statSortField === field) {
+      // Wenn das Feld bereits aktiv ist, invertiere die Richtung
+      setStatSortDirection(statSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Neues Feld aktivieren, standardmäßig absteigend für Zahlen, aufsteigend für Namen
+      setStatSortField(field);
+      setStatSortDirection(field === 'name' ? 'asc' : 'desc');
+    }
+  };
+
   const getStatistics = () => {
     const statsMap = {};
     orders.forEach(order => {
       const employee = order.name;
-      statsMap[employee] = (statsMap[employee] || 0) + 1;
+      const q = parseInt(order.quantity) || 1; // Fallback auf 1 für Altdaten ohne quantity
+      
+      if (!statsMap[employee]) {
+        statsMap[employee] = { count: 0, totalQuantity: 0 };
+      }
+      statsMap[employee].count += 1;
+      statsMap[employee].totalQuantity += q;
     });
 
     const statsArray = Object.keys(statsMap).map(employee => ({
       name: employee,
-      count: statsMap[employee]
+      count: statsMap[employee].count,
+      totalQuantity: statsMap[employee].totalQuantity
     }));
 
-    if (statSortField === 'name') {
-      return statsArray.sort((a, b) => a.name.localeCompare(b.name));
-    } else {
-      return statsArray.sort((a, b) => b.count - a.count);
-    }
+    return statsArray.sort((a, b) => {
+      let comparison = 0;
+      if (statSortField === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (statSortField === 'totalQuantity') {
+        comparison = a.totalQuantity - b.totalQuantity;
+      } else {
+        comparison = a.count - b.count;
+      }
+      return statSortDirection === 'asc' ? comparison : -comparison;
+    });
   };
 
   // --- FILTER & SORTIERUNG BESTELLUNGEN ---
@@ -210,7 +256,13 @@ export default function App() {
     inputBorder: darkMode ? '#444444' : '#cccccc',
     headerBg: darkMode ? '#1a1a1a' : '#003366',
     navBtnActive: darkMode ? '#444444' : '#002244',
-    statNumber: darkMode ? '#3b82f6' : '#003366' // Dynamische Farbe für besseren Darkmode-Kontrast
+    statNumber: darkMode ? '#3b82f6' : '#003366'
+  };
+
+  // Hilfskomponente für die Indikator-Pfeile an den Überschriften
+  const renderSortIndicator = (field) => {
+    if (statSortField !== field) return null;
+    return statSortDirection === 'asc' ? ' ▲' : ' ▼';
   };
 
   return (
@@ -276,7 +328,16 @@ export default function App() {
                   keyboardType="numeric"
                   maxLength={6}
                   value={dateInput}
-                  onChangeText={setDateInput}
+                  onChangeText={handleDateChange}
+                />
+                <TextInput
+                  ref={quantityInputRef}
+                  style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                  placeholder="Stückzahl"
+                  placeholderTextColor={theme.subText}
+                  keyboardType="numeric"
+                  value={quantity}
+                  onChangeText={setQuantity}
                 />
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity style={[styles.button, { flex: 1 }]} onPress={saveOrder}>
@@ -285,7 +346,7 @@ export default function App() {
                   {editingId && (
                     <TouchableOpacity 
                       style={[styles.button, { backgroundColor: '#6c757d' }]} 
-                      onPress={() => { setEditingId(null); setName(''); setDateInput(''); }}
+                      onPress={() => { setEditingId(null); setName(''); setDateInput(''); setQuantity(''); }}
                     >
                       <Text style={styles.buttonText}>Abbrechen</Text>
                     </TouchableOpacity>
@@ -325,6 +386,9 @@ export default function App() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.orderTextBold, { color: theme.text }]}>{item.name}</Text>
                 <Text style={[styles.dateText, { color: theme.subText }]}>Datum: {item.date}</Text>
+                {item.quantity && (
+                  <Text style={[styles.dateText, { color: theme.subText }]}>Stückzahl: {item.quantity}</Text>
+                )}
               </View>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity style={styles.editButton} onPress={() => startEditOrder(item)}>
@@ -345,36 +409,43 @@ export default function App() {
       {/* INHALT: TAB STATISTIKEN */}
       {activeTab === 'stats' && (
         <View style={{ flex: 1, padding: 10 }}>
-          <View style={[styles.card, { backgroundColor: theme.card }]}>
-            <View style={styles.sortContainer}>
-              <Text style={{ color: theme.text, marginRight: 10 }}>Sortieren nach:</Text>
-              <TouchableOpacity 
-                style={[styles.miniBtn, statSortField === 'count' && styles.miniBtnActive]}
-                onPress={() => setStatSortField('count')}
-              >
-                <Text style={styles.miniBtnText}>Anzahl</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.miniBtn, statSortField === 'name' && styles.miniBtnActive]}
-                onPress={() => setStatSortField('name')}
-              >
-                <Text style={styles.miniBtnText}>Name</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Interaktive Überschriftenzeile als Tabellen-Header */}
+          <View style={{ flexDirection: 'row', paddingHorizontal: 22, paddingVertical: 12, alignItems: 'center' }}>
+            <TouchableOpacity style={{ flex: 1 }} onPress={() => handleStatHeaderPress('name')}>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: 'bold' }} numberOfLines={1}>
+                Mitarbeiter{renderSortIndicator('name')}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={{ width: 100 }} onPress={() => handleStatHeaderPress('count')}>
+              <Text style={{ color: theme.text, fontSize: 13, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                Bestellungen{renderSortIndicator('count')}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={{ width: 100 }} onPress={() => handleStatHeaderPress('totalQuantity')}>
+              <Text style={{ color: theme.text, fontSize: 13, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                Stückzahl{renderSortIndicator('totalQuantity')}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <FlatList
             data={getStatistics()}
             keyExtractor={(item) => item.name}
             renderItem={({ item }) => (
-              <View style={[styles.orderCard, { backgroundColor: theme.card, flexDirection: 'row' }]}>
-                {/* Name links fixiert */}
+              <View style={[styles.orderCard, { backgroundColor: theme.card, flexDirection: 'row', alignItems: 'center' }]}>
+                {/* Name links flexiert mit flex: 1 gegen Box-Überragung */}
                 <Text style={[styles.orderTextBold, { color: theme.text, flex: 1 }]} numberOfLines={1}>
                   {item.name}
                 </Text>
-                {/* Dynamische Farbanpassung für perfekten Darkmode-Kontrast */}
-                <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 60, textAlign: 'right' }]}>
+                
+                {/* Werte mit zentrierter Ausrichtung und passender fixer Breite */}
+                <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 100, textAlign: 'center', fontSize: 14 }]}>
                   {item.count}
+                </Text>
+                <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 100, textAlign: 'center', fontSize: 14 }]}>
+                  {item.totalQuantity}
                 </Text>
               </View>
             )}
@@ -410,6 +481,13 @@ export default function App() {
             <TouchableOpacity style={[styles.button, { backgroundColor: '#28a745' }]} onPress={importBackupString}>
               <Text style={styles.buttonText}>Backup einspielen</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Entwicklerinformationen Box */}
+          <View style={[styles.card, { backgroundColor: theme.card, marginTop: 5, padding: 12 }]}>
+            <Text style={[styles.devTitle, { color: theme.text }]}>Entwickler-Informationen</Text>
+            <Text style={[styles.devText, { color: theme.subText }]}>Entwickler: Özgür Cetin</Text>
+            <Text style={[styles.devText, { color: theme.subText }]}>E-Mail: ozgur.cetin@web.de</Text>
           </View>
         </ScrollView>
       )}
@@ -555,6 +633,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 30,
     fontSize: 14,
+  },
+  devTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  devText: {
+    fontSize: 13,
+    lineHeight: 18,
   }
 });
-
