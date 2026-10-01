@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
@@ -11,7 +10,8 @@ import {
   Alert,
   Keyboard,
   ScrollView,
-  StatusBar
+  StatusBar,
+  Modal
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -36,6 +36,9 @@ export default function App() {
   const [statSortField, setStatSortField] = useState('name'); // 'name', 'count', oder 'totalQuantity'
   const [statSortDirection, setStatSortDirection] = useState('asc'); // 'asc' oder 'desc'
   
+  // State für Mitarbeiter-Profil Modal
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+
   // UI-States
   const [darkMode, setDarkMode] = useState(false);
   const [backupText, setBackupText] = useState('');
@@ -69,6 +72,16 @@ export default function App() {
     const century = parseInt(yearShort) <= yearCurrentShort + 10 ? '20' : '19';
     
     return `${day}.${month}.${century}${yearShort}`;
+  };
+
+  // Hilfsfunktion zum Umwandeln von TT.MM.JJJJ in ein Date-Objekt für Datumsvergleiche
+  const parseDate = (dateStr) => {
+    if (!dateStr) return new Date(0);
+    const parts = dateStr.split('.');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+    return new Date(0);
   };
 
   // Überwachung der Datumseingabe für den automatischen Wechsel
@@ -208,7 +221,14 @@ export default function App() {
       const q = parseInt(order.quantity) || 1; // Fallback auf 1 für Altdaten ohne quantity
       
       if (!statsMap[employee]) {
-        statsMap[employee] = { count: 0, totalQuantity: 0 };
+        statsMap[employee] = { count: 0, totalQuantity: 0, lastOrderDate: order.date };
+      } else {
+        // Prüfen, ob die aktuelle Bestellung neuer ist als das gespeicherte Datum
+        const currentDate = parseDate(order.date);
+        const storedDate = parseDate(statsMap[employee].lastOrderDate);
+        if (currentDate > storedDate) {
+          statsMap[employee].lastOrderDate = order.date;
+        }
       }
       statsMap[employee].count += 1;
       statsMap[employee].totalQuantity += q;
@@ -217,7 +237,8 @@ export default function App() {
     const statsArray = Object.keys(statsMap).map(employee => ({
       name: employee,
       count: statsMap[employee].count,
-      totalQuantity: statsMap[employee].totalQuantity
+      totalQuantity: statsMap[employee].totalQuantity,
+      lastOrderDate: statsMap[employee].lastOrderDate
     }));
 
     return statsArray.sort((a, b) => {
@@ -233,6 +254,14 @@ export default function App() {
     });
   };
 
+  // Holen der Bestellhistorie für einen bestimmten Mitarbeiter
+  const getEmployeeHistory = (employeeName) => {
+    if (!employeeName) return [];
+    return orders
+      .filter(order => order.name.toLowerCase() === employeeName.toLowerCase())
+      .sort((a, b) => parseDate(b.date) - parseDate(a.date));
+  };
+
   // --- FILTER & SORTIERUNG BESTELLUNGEN ---
   const getFilteredAndSortedOrders = () => {
     let result = orders.filter(order => 
@@ -242,7 +271,8 @@ export default function App() {
     if (orderSortField === 'name') {
       return result.sort((a, b) => a.name.localeCompare(b.name));
     } else {
-      return result.sort((a, b) => b.date.localeCompare(a.date));
+      // Sortierung vom aktuellsten zum ältesten Eintrag (absteigend nach Datum)
+      return result.sort((a, b) => parseDate(b.date) - parseDate(a.date));
     }
   };
 
@@ -256,7 +286,8 @@ export default function App() {
     inputBorder: darkMode ? '#444444' : '#cccccc',
     headerBg: darkMode ? '#1a1a1a' : '#003366',
     navBtnActive: darkMode ? '#444444' : '#002244',
-    statNumber: darkMode ? '#3b82f6' : '#003366'
+    statNumber: darkMode ? '#3b82f6' : '#003366',
+    modalOverlay: 'rgba(0,0,0,0.5)'
   };
 
   // Hilfskomponente für die Indikator-Pfeile an den Überschriften
@@ -434,11 +465,15 @@ export default function App() {
             data={getStatistics()}
             keyExtractor={(item) => item.name}
             renderItem={({ item }) => (
-              <View style={[styles.orderCard, { backgroundColor: theme.card, flexDirection: 'row', alignItems: 'center' }]}>
-                {/* Name links flexiert mit flex: 1 gegen Box-Überragung */}
-                <Text style={[styles.orderTextBold, { color: theme.text, flex: 1 }]} numberOfLines={1}>
-                  {item.name}
-                </Text>
+              <TouchableOpacity 
+                style={[styles.orderCard, { backgroundColor: theme.card, flexDirection: 'row', alignItems: 'center' }]}
+                onPress={() => setSelectedEmployee(item.name)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.orderTextBold, { color: theme.text }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                </View>
                 
                 {/* Werte mit zentrierter Ausrichtung und passender fixer Breite */}
                 <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 100, textAlign: 'center', fontSize: 14 }]}>
@@ -447,7 +482,7 @@ export default function App() {
                 <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 100, textAlign: 'center', fontSize: 14 }]}>
                   {item.totalQuantity}
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
             ListEmptyComponent={
               <Text style={[styles.emptyText, { color: theme.subText }]}>Keine Daten für Statistiken vorhanden.</Text>
@@ -455,6 +490,58 @@ export default function App() {
           />
         </View>
       )}
+
+      {/* MODAL: MITARBEITER-PROFIL & BESTELLHISTORIE */}
+      <Modal
+        visible={selectedEmployee !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedEmployee(null)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.modalOverlay }]}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Mitarbeiter-Profil
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedEmployee(null)}>
+                <Text style={[styles.closeModalText, { color: theme.subText }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.employeeName, { color: theme.statNumber }]}>
+              {selectedEmployee}
+            </Text>
+
+            <Text style={[styles.sectionSubtitle, { color: theme.subText }]}>
+              Bestellhistorie ({getEmployeeHistory(selectedEmployee).length} Einträge):
+            </Text>
+
+            <FlatList
+              data={getEmployeeHistory(selectedEmployee)}
+              keyExtractor={(item) => item.id}
+              style={{ maxHeight: 300, marginVertical: 10 }}
+              renderItem={({ item }) => (
+                <View style={[styles.historyItem, { borderColor: theme.inputBorder }]}>
+                  <Text style={[styles.historyText, { color: theme.text }]}>
+                    📅 {item.date}
+                  </Text>
+                  <Text style={[styles.historyText, { color: theme.text, fontWeight: 'bold' }]}>
+                    Stückzahl: {item.quantity || 1}
+                  </Text>
+                </View>
+              )}
+            />
+
+            <TouchableOpacity 
+              style={[styles.button, { marginTop: 10 }]} 
+              onPress={() => setSelectedEmployee(null)}
+            >
+              <Text style={styles.buttonText}>Schließen</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* INHALT: TAB BACKUP */}
       {activeTab === 'backup' && (
@@ -642,5 +729,54 @@ const styles = StyleSheet.create({
   devText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  // Modal & Profil Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    borderRadius: 10,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  closeModalText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    padding: 4,
+  },
+  employeeName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginVertical: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    borderBottomWidth: 1,
+  },
+  historyText: {
+    fontSize: 14,
   }
 });
