@@ -307,7 +307,7 @@ export default function App() {
           style={styles.modeToggle} 
           onPress={() => setDarkMode(!darkMode)}
         >
-          <Text style={styles.modeToggleText}>{darkMode ? '☀️ Light' : '🌙 Dark'}</Text>
+          <Text style={styles.modeToggleText}>{darkMode ? '☀️️ Light' : '🌙 Dark'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -523,12 +523,17 @@ export default function App() {
               style={{ maxHeight: 300, marginVertical: 10 }}
               renderItem={({ item }) => (
                 <View style={[styles.historyItem, { borderColor: theme.inputBorder }]}>
-                  <Text style={[styles.historyText, { color: theme.text }]}>
+                  <Text style={[styles.historyText, { color: theme.text, flex: 1 }]}>
                     📅 {item.date}
                   </Text>
-                  <Text style={[styles.historyText, { color: theme.text, fontWeight: 'bold' }]}>
-                    Stückzahl: {item.quantity || 1}
-                  </Text>
+                  <View style={styles.historyQuantityContainer}>
+                    <Text style={[styles.historyText, { color: theme.text }]}>
+                      Stückzahl:
+                    </Text>
+                    <Text style={[styles.historyText, { color: theme.text, fontWeight: 'bold', width: 28, textAlign: 'right' }]}>
+                      {item.quantity || 1}
+                    </Text>
+                  </View>
                 </View>
               )}
             />
@@ -772,9 +777,14 @@ const styles = StyleSheet.create({
   historyItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 5,
     borderBottomWidth: 1,
+  },
+  historyQuantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   historyText: {
     fontSize: 14,
