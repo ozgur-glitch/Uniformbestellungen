@@ -24,7 +24,7 @@ export default function App() {
   const [quantity, setQuantity] = useState(''); // Neues State für die Anzahl der bestellten Stückzahlen
   const [editingId, setEditingId] = useState(null); // ID der Bestellung, die bearbeitet wird
   
-  // Ref für den automatischen Fokuswechsel
+  // Ref für den automatischen Fokuswechsel (Formular)
   const quantityInputRef = useRef(null);
 
   // App-Daten-States
@@ -32,10 +32,16 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [orderSortField, setOrderSortField] = useState('date'); // 'name' oder 'date'
   
-  // Neue Sortier-States für Statistiken (Spaltenklick, Auf-/Absteigend)
+  // Sortier-States für Statistiken (Spaltenklick, Auf-/Absteigend)
   const [statSortField, setStatSortField] = useState('name'); // 'name', 'count', oder 'totalQuantity'
   const [statSortDirection, setStatSortDirection] = useState('asc'); // 'asc' oder 'desc'
   
+  // Datums- und Namensfilter-States für Statistiken (Format: TTMMJJ)
+  const [statSearchQuery, setStatSearchQuery] = useState('');
+  const [statStartDate, setStatStartDate] = useState('');
+  const [statEndDate, setStatEndDate] = useState('');
+  const endDateInputRef = useRef(null);
+
   // State für Mitarbeiter-Profil Modal
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
@@ -84,13 +90,33 @@ export default function App() {
     return new Date(0);
   };
 
-  // Überwachung der Datumseingabe für den automatischen Wechsel
+  // Hilfsfunktion zum Umwandeln eines TTMMJJ-Strings in ein Date-Objekt für den Filter
+  const parseRawInputDate = (rawInput) => {
+    const cleaned = rawInput.replace(/\D/g, '');
+    if (cleaned.length !== 6) return null;
+    const day = parseInt(cleaned.substring(0, 2), 10);
+    const month = parseInt(cleaned.substring(2, 4), 10) - 1;
+    const yearShort = parseInt(cleaned.substring(4, 6), 10);
+    const yearCurrentShort = new Date().getFullYear() % 100;
+    const century = yearShort <= yearCurrentShort + 10 ? 2000 : 1900;
+    return new Date(century + yearShort, month, day);
+  };
+
+  // Überwachung der Datumseingabe im Formular
   const handleDateChange = (text) => {
     setDateInput(text);
     const cleaned = text.replace(/\D/g, '');
     if (cleaned.length === 6) {
-      // Wenn 6 Zahlen erreicht sind, fokussiere das Stückzahlen-Feld
       quantityInputRef.current?.focus();
+    }
+  };
+
+  // Überwachung der Startdatumseingabe im Statistik-Filter
+  const handleStatStartDateChange = (text) => {
+    setStatStartDate(text);
+    const cleaned = text.replace(/\D/g, '');
+    if (cleaned.length === 6) {
+      endDateInputRef.current?.focus();
     }
   };
 
@@ -132,8 +158,8 @@ export default function App() {
       setOrders(updatedOrders);
       
       setName('');
-      setDateInput(''); // Leert das Datumsfeld nach dem Speichern wieder
-      setQuantity('');  // Leert das Stückzahlfeld nach dem Speichern wieder
+      setDateInput('');
+      setQuantity('');
       Keyboard.dismiss();
       Alert.alert('Erfolg', editingId ? 'Bestellung aktualisiert!' : 'Bestellung wurde registriert!');
     } catch (error) {
@@ -143,7 +169,7 @@ export default function App() {
 
   const startEditOrder = (order) => {
     setName(order.name);
-    setQuantity(order.quantity ? order.quantity : '1'); // Fallback für bestehende Altdaten ohne Quantity
+    setQuantity(order.quantity ? order.quantity : '1');
     const rawDate = order.date.replace(/\./g, '');
     if (rawDate.length === 8) {
       const dd = rawDate.substring(0, 2);
@@ -205,25 +231,40 @@ export default function App() {
   // --- STATISTIK GENERIEREN UND SORTIEREN ---
   const handleStatHeaderPress = (field) => {
     if (statSortField === field) {
-      // Wenn das Feld bereits aktiv ist, invertiere die Richtung
       setStatSortDirection(statSortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // Neues Feld aktivieren, standardmäßig absteigend für Zahlen, aufsteigend für Namen
       setStatSortField(field);
       setStatSortDirection(field === 'name' ? 'asc' : 'desc');
     }
   };
 
   const getStatistics = () => {
+    // Vorbereiten der Datums-Filtergrenzen
+    const startDateObj = parseRawInputDate(statStartDate);
+    const endDateObj = parseRawInputDate(statEndDate);
+
+    if (endDateObj) {
+      // Auf das Ende des Tages setzen (23:59:59) für exakte inkludierende Vergleiche
+      endDateObj.setHours(23, 59, 59, 999);
+    }
+
+    // Filtern der Bestellungen nach gewähltem Zeitraum und Name
+    const filteredOrders = orders.filter(order => {
+      const orderDate = parseDate(order.date);
+      if (startDateObj && orderDate < startDateObj) return false;
+      if (endDateObj && orderDate > endDateObj) return false;
+      if (statSearchQuery.trim() !== '' && !order.name.toLowerCase().includes(statSearchQuery.toLowerCase().trim())) return false;
+      return true;
+    });
+
     const statsMap = {};
-    orders.forEach(order => {
+    filteredOrders.forEach(order => {
       const employee = order.name;
-      const q = parseInt(order.quantity) || 1; // Fallback auf 1 für Altdaten ohne quantity
+      const q = parseInt(order.quantity) || 1;
       
       if (!statsMap[employee]) {
         statsMap[employee] = { count: 0, totalQuantity: 0, lastOrderDate: order.date };
       } else {
-        // Prüfen, ob die aktuelle Bestellung neuer ist als das gespeicherte Datum
         const currentDate = parseDate(order.date);
         const storedDate = parseDate(statsMap[employee].lastOrderDate);
         if (currentDate > storedDate) {
@@ -271,7 +312,6 @@ export default function App() {
     if (orderSortField === 'name') {
       return result.sort((a, b) => a.name.localeCompare(b.name));
     } else {
-      // Sortierung vom aktuellsten zum ältesten Eintrag (absteigend nach Datum)
       return result.sort((a, b) => parseDate(b.date) - parseDate(a.date));
     }
   };
@@ -307,7 +347,7 @@ export default function App() {
           style={styles.modeToggle} 
           onPress={() => setDarkMode(!darkMode)}
         >
-          <Text style={styles.modeToggleText}>{darkMode ? '☀️️ Light' : '🌙 Dark'}</Text>
+          <Text style={styles.modeToggleText}>{darkMode ? '☀ Light' : '🌙 Dark'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -440,6 +480,49 @@ export default function App() {
       {/* INHALT: TAB STATISTIKEN */}
       {activeTab === 'stats' && (
         <View style={{ flex: 1, padding: 10 }}>
+          {/* Filter für Statistiken */}
+          <View style={[styles.card, { backgroundColor: theme.card, marginBottom: 10 }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Statistiken filtern</Text>
+            
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+              placeholder="🔍 Namen suchen..."
+              placeholderTextColor={theme.subText}
+              value={statSearchQuery}
+              onChangeText={setStatSearchQuery}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                placeholder="Von (TTMMJJ)"
+                placeholderTextColor={theme.subText}
+                keyboardType="numeric"
+                maxLength={6}
+                value={statStartDate}
+                onChangeText={handleStatStartDateChange}
+              />
+              <TextInput
+                ref={endDateInputRef}
+                style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                placeholder="Bis (TTMMJJ)"
+                placeholderTextColor={theme.subText}
+                keyboardType="numeric"
+                maxLength={6}
+                value={statEndDate}
+                onChangeText={setStatEndDate}
+              />
+            </View>
+            {(statStartDate !== '' || statEndDate !== '' || statSearchQuery !== '') && (
+              <TouchableOpacity 
+                style={{ marginTop: 8, alignSelf: 'flex-end' }}
+                onPress={() => { setStatStartDate(''); setStatEndDate(''); setStatSearchQuery(''); }}
+              >
+                <Text style={{ color: '#dc3545', fontSize: 12, fontWeight: 'bold' }}>Filter zurücksetzen</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {/* Interaktive Überschriftenzeile als Tabellen-Header */}
           <View style={{ flexDirection: 'row', paddingHorizontal: 22, paddingVertical: 12, alignItems: 'center' }}>
             <TouchableOpacity style={{ flex: 1 }} onPress={() => handleStatHeaderPress('name')}>
@@ -475,7 +558,6 @@ export default function App() {
                   </Text>
                 </View>
                 
-                {/* Werte mit zentrierter Ausrichtung und passender fixer Breite */}
                 <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 100, textAlign: 'center', fontSize: 14 }]}>
                   {item.count}
                 </Text>
