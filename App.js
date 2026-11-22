@@ -20,11 +20,12 @@ const STORAGE_KEY = '@uniform_orders_key';
 export default function App() {
   // Formular-States
   const [name, setName] = useState('');
-  const [dateInput, setDateInput] = useState(''); // Startet immer komplett leer
-  const [quantity, setQuantity] = useState(''); // Neues State für die Anzahl der bestellten Stückzahlen
-  const [editingId, setEditingId] = useState(null); // ID der Bestellung, die bearbeitet wird
+  const [dateInput, setDateInput] = useState(''); 
+  const [quantity, setQuantity] = useState(''); 
+  const [editingId, setEditingId] = useState(null); 
   
-  // Ref für den automatischen Fokuswechsel (Formular)
+  // Refs für den automatischen Fokuswechsel (Formular)
+  const dateInputRef = useRef(null);
   const quantityInputRef = useRef(null);
 
   // App-Daten-States
@@ -32,15 +33,15 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [orderSortField, setOrderSortField] = useState('date'); // 'name' oder 'date'
   
-  // Sortier-States für Statistiken (Spaltenklick, Auf-/Absteigend)
-  const [statSortField, setStatSortField] = useState('name'); // 'name', 'count', oder 'totalQuantity'
-  const [statSortDirection, setStatSortDirection] = useState('asc'); // 'asc' oder 'desc'
+  // Sortier-States für Statistiken
+  const [statSortField, setStatSortField] = useState('name'); 
+  const [statSortDirection, setStatSortDirection] = useState('asc'); 
   
-  // Datums- und Namensfilter-States für Statistiken (Format: TTMMJJ)
+  // Datums- und Namensfilter-States für Statistiken
   const [statSearchQuery, setStatSearchQuery] = useState('');
   const [statStartDate, setStatStartDate] = useState('');
   const [statEndDate, setStatEndDate] = useState('');
-  const endDateInputRef = useRef(null);
+  const statEndDateInputRef = useRef(null);
 
   // State für Mitarbeiter-Profil Modal
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -48,7 +49,7 @@ export default function App() {
   // UI-States
   const [darkMode, setDarkMode] = useState(false);
   const [backupText, setBackupText] = useState('');
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'stats', 'backup'
+  const [activeTab, setActiveTab] = useState('orders'); 
 
   useEffect(() => {
     loadOrders();
@@ -65,22 +66,18 @@ export default function App() {
     }
   };
 
-  // Hilfsfunktion zur Umwandlung von TTMMJJ in TT.MM.JJJJ
+  // Hilfsfunktion zur Umwandlung von TTMMJJJJ in TT.MM.JJJJ
   const formatDisplayDate = (input) => {
     const cleaned = input.replace(/\D/g, '');
-    if (cleaned.length !== 6) return input;
+    if (cleaned.length !== 8) return input;
     
     const day = cleaned.substring(0, 2);
     const month = cleaned.substring(2, 4);
-    const yearShort = cleaned.substring(4, 6);
+    const year = cleaned.substring(4, 8);
     
-    const yearCurrentShort = new Date().getFullYear() % 100;
-    const century = parseInt(yearShort) <= yearCurrentShort + 10 ? '20' : '19';
-    
-    return `${day}.${month}.${century}${yearShort}`;
+    return `${day}.${month}.${year}`;
   };
 
-  // Hilfsfunktion zum Umwandeln von TT.MM.JJJJ in ein Date-Objekt für Datumsvergleiche
   const parseDate = (dateStr) => {
     if (!dateStr) return new Date(0);
     const parts = dateStr.split('.');
@@ -90,33 +87,28 @@ export default function App() {
     return new Date(0);
   };
 
-  // Hilfsfunktion zum Umwandeln eines TTMMJJ-Strings in ein Date-Objekt für den Filter
   const parseRawInputDate = (rawInput) => {
     const cleaned = rawInput.replace(/\D/g, '');
-    if (cleaned.length !== 6) return null;
+    if (cleaned.length !== 8) return null;
     const day = parseInt(cleaned.substring(0, 2), 10);
     const month = parseInt(cleaned.substring(2, 4), 10) - 1;
-    const yearShort = parseInt(cleaned.substring(4, 6), 10);
-    const yearCurrentShort = new Date().getFullYear() % 100;
-    const century = yearShort <= yearCurrentShort + 10 ? 2000 : 1900;
-    return new Date(century + yearShort, month, day);
+    const year = parseInt(cleaned.substring(4, 8), 10);
+    return new Date(year, month, day);
   };
 
-  // Überwachung der Datumseingabe im Formular
   const handleDateChange = (text) => {
     setDateInput(text);
     const cleaned = text.replace(/\D/g, '');
-    if (cleaned.length === 6) {
+    if (cleaned.length === 8) {
       quantityInputRef.current?.focus();
     }
   };
 
-  // Überwachung der Startdatumseingabe im Statistik-Filter
   const handleStatStartDateChange = (text) => {
     setStatStartDate(text);
     const cleaned = text.replace(/\D/g, '');
-    if (cleaned.length === 6) {
-      endDateInputRef.current?.focus();
+    if (cleaned.length === 8) {
+      statEndDateInputRef.current?.focus();
     }
   };
 
@@ -126,8 +118,8 @@ export default function App() {
       return;
     }
 
-    if (dateInput.replace(/\D/g, '').length !== 6) {
-      Alert.alert('Fehler', 'Das Datum muss im Format TTMMJJ eingegeben werden (z.B. 220626).');
+    if (dateInput.replace(/\D/g, '').length !== 8) {
+      Alert.alert('Fehler', 'Das Datum muss im Format TT.MM.JJJJ eingegeben werden.');
       return;
     }
 
@@ -171,15 +163,24 @@ export default function App() {
     setName(order.name);
     setQuantity(order.quantity ? order.quantity : '1');
     const rawDate = order.date.replace(/\./g, '');
-    if (rawDate.length === 8) {
-      const dd = rawDate.substring(0, 2);
-      const mm = rawDate.substring(2, 4);
-      const yy = rawDate.substring(6, 8);
-      setDateInput(`${dd}${mm}${yy}`);
-    } else {
-      setDateInput(rawDate);
-    }
+    setDateInput(rawDate);
     setEditingId(order.id);
+  };
+
+  // Löschen mit Sicherheitsabfrage
+  const confirmDeleteOrder = (id, employeeName) => {
+    Alert.alert(
+      'Bestellung löschen',
+      `Möchtest du den Eintrag für "${employeeName}" wirklich unwiderruflich löschen?`,
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        { 
+          text: 'Löschen', 
+          style: 'destructive', 
+          onPress: () => deleteOrder(id) 
+        }
+      ]
+    );
   };
 
   const deleteOrder = async (id) => {
@@ -198,7 +199,6 @@ export default function App() {
     }
   };
 
-  // --- BACKUP FUNKTIONEN ---
   const generateBackupString = () => {
     if (orders.length === 0) {
       Alert.alert('Hinweis', 'Keine Daten zum Exportieren vorhanden.');
@@ -228,7 +228,6 @@ export default function App() {
     }
   };
 
-  // --- STATISTIK GENERIEREN UND SORTIEREN ---
   const handleStatHeaderPress = (field) => {
     if (statSortField === field) {
       setStatSortDirection(statSortDirection === 'asc' ? 'desc' : 'asc');
@@ -239,16 +238,13 @@ export default function App() {
   };
 
   const getStatistics = () => {
-    // Vorbereiten der Datums-Filtergrenzen
     const startDateObj = parseRawInputDate(statStartDate);
     const endDateObj = parseRawInputDate(statEndDate);
 
     if (endDateObj) {
-      // Auf das Ende des Tages setzen (23:59:59) für exakte inkludierende Vergleiche
       endDateObj.setHours(23, 59, 59, 999);
     }
 
-    // Filtern der Bestellungen nach gewähltem Zeitraum und Name
     const filteredOrders = orders.filter(order => {
       const orderDate = parseDate(order.date);
       if (startDateObj && orderDate < startDateObj) return false;
@@ -295,7 +291,6 @@ export default function App() {
     });
   };
 
-  // Holen der Bestellhistorie für einen bestimmten Mitarbeiter
   const getEmployeeHistory = (employeeName) => {
     if (!employeeName) return [];
     return orders
@@ -303,7 +298,6 @@ export default function App() {
       .sort((a, b) => parseDate(b.date) - parseDate(a.date));
   };
 
-  // --- FILTER & SORTIERUNG BESTELLUNGEN ---
   const getFilteredAndSortedOrders = () => {
     let result = orders.filter(order => 
       order.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -316,7 +310,6 @@ export default function App() {
     }
   };
 
-  // Dynamische Styles für den Darkmode
   const theme = {
     bg: darkMode ? '#121212' : '#f5f5f5',
     card: darkMode ? '#1e1e1e' : '#ffffff',
@@ -327,10 +320,10 @@ export default function App() {
     headerBg: darkMode ? '#1a1a1a' : '#003366',
     navBtnActive: darkMode ? '#444444' : '#002244',
     statNumber: darkMode ? '#3b82f6' : '#003366',
-    modalOverlay: 'rgba(0,0,0,0.5)'
+    modalOverlay: 'rgba(0,0,0,0.5)',
+    actionBg: darkMode ? '#2a2a2a' : '#f0f2f5',
   };
 
-  // Hilfskomponente für die Indikator-Pfeile an den Überschriften
   const renderSortIndicator = (field) => {
     if (statSortField !== field) return null;
     return statSortDirection === 'asc' ? ' ▲' : ' ▼';
@@ -391,15 +384,22 @@ export default function App() {
                   placeholderTextColor={theme.subText}
                   value={name}
                   onChangeText={setName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => dateInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
                 <TextInput
+                  ref={dateInputRef}
                   style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                  placeholder="Bestelldatum (Format: TTMMJJ, z.B. 220626)"
+                  placeholder="Datum: TT.MM.JJJJ (z.B. 22.06.2026)"
                   placeholderTextColor={theme.subText}
                   keyboardType="numeric"
-                  maxLength={6}
+                  maxLength={8}
                   value={dateInput}
                   onChangeText={handleDateChange}
+                  returnKeyType="next"
+                  onSubmitEditing={() => quantityInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
                 <TextInput
                   ref={quantityInputRef}
@@ -409,6 +409,8 @@ export default function App() {
                   keyboardType="numeric"
                   value={quantity}
                   onChangeText={setQuantity}
+                  returnKeyType="done"
+                  onSubmitEditing={saveOrder}
                 />
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity style={[styles.button, { flex: 1 }]} onPress={saveOrder}>
@@ -461,12 +463,19 @@ export default function App() {
                   <Text style={[styles.dateText, { color: theme.subText }]}>Stückzahl: {item.quantity}</Text>
                 )}
               </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TouchableOpacity style={styles.editButton} onPress={() => startEditOrder(item)}>
-                  <Text style={styles.editButtonText}>✏️</Text>
+              {/* Action-Buttons mit Sicherheitsabfrage beim Löschen */}
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, { backgroundColor: theme.actionBg }]} 
+                  onPress={() => startEditOrder(item)}
+                >
+                  <Text style={{ fontSize: 16 }}>✏️</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteButton} onPress={() => deleteOrder(item.id)}>
-                  <Text style={styles.deleteButtonText}>X</Text>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, { backgroundColor: theme.actionBg }]} 
+                  onPress={() => confirmDeleteOrder(item.id, item.name)}
+                >
+                  <Text style={{ fontSize: 16 }}>🗑️</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -495,20 +504,20 @@ export default function App() {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TextInput
                 style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                placeholder="Von (TTMMJJ)"
+                placeholder="Von (TT.MM.JJJJ)"
                 placeholderTextColor={theme.subText}
                 keyboardType="numeric"
-                maxLength={6}
+                maxLength={8}
                 value={statStartDate}
                 onChangeText={handleStatStartDateChange}
               />
               <TextInput
-                ref={endDateInputRef}
+                ref={statEndDateInputRef}
                 style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                placeholder="Bis (TTMMJJ)"
+                placeholder="Bis (TT.MM.JJJJ)"
                 placeholderTextColor={theme.subText}
                 keyboardType="numeric"
-                maxLength={6}
+                maxLength={8}
                 value={statEndDate}
                 onChangeText={setStatEndDate}
               />
@@ -633,6 +642,23 @@ export default function App() {
       {/* INHALT: TAB BACKUP */}
       {activeTab === 'backup' && (
         <ScrollView style={{ padding: 10 }}>
+          {/* Benutzerhandbuch / Anleitung */}
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>📖 Benutzerhandbuch</Text>
+            <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bestellungen erfassen:</Text> Gib den Namen ein und drücke Enter, um zum Datumsfeld zu springen. Nach Eingabe der Stückzahl speichert ein weiterer Druck auf Enter die Bestellung automatisch.
+            </Text>
+            <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Datumsformat:</Text> Gib das Datum 8-stellig ein (z.B. 22062026 für den 22.06.2026). Es wird automatisch formatiert.
+            </Text>
+            <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bearbeiten & Löschen:</Text> Nutze die Symbole neben den Einträgen. Das Löschen erfordert eine Sicherheitsbestätigung.
+            </Text>
+            <Text style={[styles.devText, { color: theme.subText, marginBottom: 4 }]}>
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> Im Statistik-Tab kannst du nach Namen oder Zeiträumen filtern und per Klick auf einen Mitarbeiter dessen Detailhistorie einsehen.
+            </Text>
+          </View>
+
           <View style={[styles.card, { backgroundColor: theme.card }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Daten Sichern & Wiederherstellen</Text>
             <Text style={[styles.orderText, { color: theme.subText, marginBottom: 15 }]}>
@@ -780,28 +806,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-  editButton: {
-    backgroundColor: '#ffc107',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  actionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  editButtonText: {
-    fontSize: 14,
-  },
-  deleteButton: {
-    backgroundColor: '#dc3545',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   emptyText: {
     textAlign: 'center',
