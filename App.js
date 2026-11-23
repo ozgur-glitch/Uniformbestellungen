@@ -33,9 +33,9 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [orderSortField, setOrderSortField] = useState('date'); // 'name' oder 'date'
   
-  // Sortier-States für Statistiken
-  const [statSortField, setStatSortField] = useState('name'); 
-  const [statSortDirection, setStatSortDirection] = useState('asc'); 
+  // Sortier-States für Statistiken (Standard auf 'totalQuantity' und absteigend)
+  const [statSortField, setStatSortField] = useState('totalQuantity'); 
+  const [statSortDirection, setStatSortDirection] = useState('desc'); 
   
   // Datums- und Namensfilter-States für Statistiken
   const [statSearchQuery, setStatSearchQuery] = useState('');
@@ -353,7 +353,27 @@ export default function App() {
     inputBorder: darkMode ? '#444444' : '#cccccc',
     headerBg: darkMode ? '#1a1a1a' : '#003366',
     navBtnActive: darkMode ? '#444444' : '#002244',
-    statNumber: darkMode ? '#3b82f6' : '#003366',
+    
+    // 1. Bestellungen (Best.) -> Bernstein / Gelb-Orange
+    countBg: darkMode ? '#452b00' : '#fef3c7',
+    countText: darkMode ? '#f59e0b' : '#b45309',
+
+    // 2. Gesamtstückzahl (Ges.) -> Royalblau
+    totalBg: darkMode ? '#172554' : '#dbeafe',
+    totalText: darkMode ? '#3b82f6' : '#1d4ed8',
+
+    // 3. 3 Monate (3M) -> Kräftiges Rot
+    m3Bg: darkMode ? '#4c0519' : '#ffe4e6',
+    m3Text: darkMode ? '#fb7185' : '#e11d48',
+
+    // 4. 6 Monate (6M) -> Klares Grün
+    m6Bg: darkMode ? '#022c22' : '#d1fae5',
+    m6Text: darkMode ? '#34d399' : '#047857',
+
+    // 5. 12 Monate (12M) -> Türkis / Cyan
+    m12Bg: darkMode ? '#083344' : '#cffafe',
+    m12Text: darkMode ? '#22d3ee' : '#0e7490',
+
     modalOverlay: 'rgba(0,0,0,0.5)',
     actionBg: darkMode ? '#2a2a2a' : '#f0f2f5',
   };
@@ -565,7 +585,7 @@ export default function App() {
             )}
           </View>
 
-          {/* Tabellen-Header (Exakt auf 100% Breite optimiert ohne horizontales Scrollen) */}
+          {/* Tabellen-Header */}
           <View style={[styles.statHeaderRow, { backgroundColor: theme.card }]}>
             <TouchableOpacity style={{ flex: 2.2 }} onPress={() => handleStatHeaderPress('name')}>
               <Text style={{ color: theme.text, fontSize: 11, fontWeight: 'bold' }} numberOfLines={1}>
@@ -573,32 +593,37 @@ export default function App() {
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('count')}>
-              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+            {/* Best. Header (Bernstein) */}
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.countBg, paddingVertical: 2, borderRadius: 4 }} onPress={() => handleStatHeaderPress('count')}>
+              <Text style={{ color: theme.countText, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 Best.{renderSortIndicator('count')}
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('totalQuantity')}>
-              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+            {/* Ges. Header (Royalblau) */}
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.totalBg, paddingVertical: 2, borderRadius: 4, marginHorizontal: 2 }} onPress={() => handleStatHeaderPress('totalQuantity')}>
+              <Text style={{ color: theme.totalText, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 Ges.{renderSortIndicator('totalQuantity')}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('m3')}>
-              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+            {/* 3M Header (Rot) */}
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.m3Bg, paddingVertical: 2, borderRadius: 4 }} onPress={() => handleStatHeaderPress('m3')}>
+              <Text style={{ color: theme.m3Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 3M{renderSortIndicator('m3')}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('m6')}>
-              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+            {/* 6M Header (Grün) */}
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.m6Bg, paddingVertical: 2, borderRadius: 4, marginHorizontal: 2 }} onPress={() => handleStatHeaderPress('m6')}>
+              <Text style={{ color: theme.m6Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 6M{renderSortIndicator('m6')}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ flex: 1.1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('m12')}>
-              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+            {/* 12M Header (Türkis) */}
+            <TouchableOpacity style={{ flex: 1.1, alignItems: 'center', backgroundColor: theme.m12Bg, paddingVertical: 2, borderRadius: 4 }} onPress={() => handleStatHeaderPress('m12')}>
+              <Text style={{ color: theme.m12Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 12M{renderSortIndicator('m12')}
               </Text>
             </TouchableOpacity>
@@ -618,19 +643,24 @@ export default function App() {
                   </Text>
                 </View>
                 
-                <Text style={[styles.orderTextBold, { color: theme.statNumber, flex: 1, textAlign: 'center', fontSize: 12 }]}>
+                {/* Best. Zelle (Bernstein) */}
+                <Text style={[styles.orderTextBold, { color: theme.countText, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.countBg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.count}
                 </Text>
-                <Text style={[styles.orderTextBold, { color: theme.statNumber, flex: 1, textAlign: 'center', fontSize: 12 }]}>
+                {/* Ges. Zelle (Royalblau) */}
+                <Text style={[styles.orderTextBold, { color: theme.totalText, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.totalBg, paddingVertical: 4, borderRadius: 4, marginHorizontal: 2 }]}>
                   {item.totalQuantity}
                 </Text>
-                <Text style={[styles.orderTextBold, { color: theme.subText, flex: 1, textAlign: 'center', fontSize: 12 }]}>
+                {/* 3M Zelle (Rot) */}
+                <Text style={[styles.orderTextBold, { color: theme.m3Text, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m3Bg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.m3}
                 </Text>
-                <Text style={[styles.orderTextBold, { color: theme.subText, flex: 1, textAlign: 'center', fontSize: 12 }]}>
+                {/* 6M Zelle (Grün) */}
+                <Text style={[styles.orderTextBold, { color: theme.m6Text, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m6Bg, paddingVertical: 4, borderRadius: 4, marginHorizontal: 2 }]}>
                   {item.m6}
                 </Text>
-                <Text style={[styles.orderTextBold, { color: theme.subText, flex: 1.1, textAlign: 'center', fontSize: 12 }]}>
+                {/* 12M Zelle (Türkis) */}
+                <Text style={[styles.orderTextBold, { color: theme.m12Text, flex: 1.1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m12Bg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.m12}
                 </Text>
               </TouchableOpacity>
@@ -715,7 +745,7 @@ export default function App() {
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bearbeiten & Löschen:</Text> Nutze die Symbole neben den Einträgen. Das Löschen erfordert eine Sicherheitsbestätigung.
             </Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 4 }]}>
-              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> Im Statistik-Tab siehst du Stückzahlen direkt übersichtlich nach 3, 6 und 12 Monaten in einer Tabelle ohne Scrollen. Alle Spalten sind klickbar zum Sortieren. Per Klick auf einen Mitarbeiter öffnet sich seine Historie.
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> 3M (Rot), 6M (Grün) und 12M (Türkis) besitzen nun klare, unterscheidbare Farben. Alle Spalten sind klickbar zum Sortieren.
             </Text>
           </View>
 
@@ -857,7 +887,7 @@ const styles = StyleSheet.create({
   statHeaderRow: {
     flexDirection: 'row',
     marginHorizontal: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 6,
@@ -866,8 +896,8 @@ const styles = StyleSheet.create({
   statItemRow: {
     marginHorizontal: 10,
     marginVertical: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
