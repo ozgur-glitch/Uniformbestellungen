@@ -112,6 +112,17 @@ export default function App() {
     }
   };
 
+  // Ermittelt eindeutige, bereits eingetragene Namen für die Autovervollständigung
+  const getUniqueEmployeeSuggestions = () => {
+    if (!name.trim()) return [];
+    const allNames = orders.map(o => o.name);
+    const uniqueNames = [...new Set(allNames)];
+    return uniqueNames.filter(n => 
+      n.toLowerCase().includes(name.toLowerCase().trim()) && 
+      n.toLowerCase() !== name.toLowerCase().trim()
+    );
+  };
+
   const saveOrder = async () => {
     if (!name.trim() || !dateInput.trim() || !quantity.trim()) {
       Alert.alert('Fehler', 'Bitte fülle alle Felder aus.');
@@ -354,28 +365,20 @@ export default function App() {
     headerBg: darkMode ? '#1a1a1a' : '#003366',
     navBtnActive: darkMode ? '#444444' : '#002244',
     
-    // 1. Bestellungen (Best.) -> Bernstein / Gelb-Orange
     countBg: darkMode ? '#452b00' : '#fef3c7',
     countText: darkMode ? '#f59e0b' : '#b45309',
-
-    // 2. Gesamtstückzahl (Ges.) -> Royalblau
     totalBg: darkMode ? '#172554' : '#dbeafe',
     totalText: darkMode ? '#3b82f6' : '#1d4ed8',
-
-    // 3. 3 Monate (3M) -> Kräftiges Rot
     m3Bg: darkMode ? '#4c0519' : '#ffe4e6',
     m3Text: darkMode ? '#fb7185' : '#e11d48',
-
-    // 4. 6 Monate (6M) -> Klares Grün
-    m6Bg: darkMode ? '#022c22' : '#d1fae5',
-    m6Text: darkMode ? '#34d399' : '#047857',
-
-    // 5. 12 Monate (12M) -> Türkis / Cyan
+    m6Bg: darkMode ? '#450a0a' : '#fee2e2',
+    m6Text: darkMode ? '#f87171' : '#991b1b',
     m12Bg: darkMode ? '#083344' : '#cffafe',
     m12Text: darkMode ? '#22d3ee' : '#0e7490',
 
     modalOverlay: 'rgba(0,0,0,0.5)',
     actionBg: darkMode ? '#2a2a2a' : '#f0f2f5',
+    suggestionBg: darkMode ? '#252a34' : '#ffffff',
   };
 
   const renderSortIndicator = (field) => {
@@ -432,16 +435,38 @@ export default function App() {
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   {editingId ? 'Bestellung bearbeiten' : 'Neue Bestellung'}
                 </Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                  placeholder="Mitarbeiter Name"
-                  placeholderTextColor={theme.subText}
-                  value={name}
-                  onChangeText={setName}
-                  returnKeyType="next"
-                  onSubmitEditing={() => dateInputRef.current?.focus()}
-                  blurOnSubmit={false}
-                />
+                
+                <View style={{ position: 'relative', zIndex: 10 }}>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                    placeholder="Mitarbeiter Name"
+                    placeholderTextColor={theme.subText}
+                    value={name}
+                    onChangeText={setName}
+                    returnKeyType="next"
+                    onSubmitEditing={() => dateInputRef.current?.focus()}
+                    blurOnSubmit={false}
+                  />
+
+                  {/* Autovervollständigungs-Vorschläge */}
+                  {getUniqueEmployeeSuggestions().length > 0 && (
+                    <View style={[styles.suggestionsContainer, { backgroundColor: theme.suggestionBg, borderColor: theme.inputBorder }]}>
+                      {getUniqueEmployeeSuggestions().map((suggestion, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.suggestionItem}
+                          onPress={() => {
+                            setName(suggestion);
+                            dateInputRef.current?.focus();
+                          }}
+                        >
+                          <Text style={{ color: theme.text, fontSize: 14 }}>👤 {suggestion}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
                 <TextInput
                   ref={dateInputRef}
                   style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
@@ -593,35 +618,30 @@ export default function App() {
               </Text>
             </TouchableOpacity>
             
-            {/* Best. Header (Bernstein) */}
             <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.countBg, paddingVertical: 2, borderRadius: 4 }} onPress={() => handleStatHeaderPress('count')}>
               <Text style={{ color: theme.countText, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 Best.{renderSortIndicator('count')}
               </Text>
             </TouchableOpacity>
             
-            {/* Ges. Header (Royalblau) */}
             <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.totalBg, paddingVertical: 2, borderRadius: 4, marginHorizontal: 2 }} onPress={() => handleStatHeaderPress('totalQuantity')}>
               <Text style={{ color: theme.totalText, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 Ges.{renderSortIndicator('totalQuantity')}
               </Text>
             </TouchableOpacity>
 
-            {/* 3M Header (Rot) */}
             <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.m3Bg, paddingVertical: 2, borderRadius: 4 }} onPress={() => handleStatHeaderPress('m3')}>
               <Text style={{ color: theme.m3Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 3M{renderSortIndicator('m3')}
               </Text>
             </TouchableOpacity>
 
-            {/* 6M Header (Grün) */}
             <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.m6Bg, paddingVertical: 2, borderRadius: 4, marginHorizontal: 2 }} onPress={() => handleStatHeaderPress('m6')}>
               <Text style={{ color: theme.m6Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 6M{renderSortIndicator('m6')}
               </Text>
             </TouchableOpacity>
 
-            {/* 12M Header (Türkis) */}
             <TouchableOpacity style={{ flex: 1.1, alignItems: 'center', backgroundColor: theme.m12Bg, paddingVertical: 2, borderRadius: 4 }} onPress={() => handleStatHeaderPress('m12')}>
               <Text style={{ color: theme.m12Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 12M{renderSortIndicator('m12')}
@@ -643,23 +663,18 @@ export default function App() {
                   </Text>
                 </View>
                 
-                {/* Best. Zelle (Bernstein) */}
                 <Text style={[styles.orderTextBold, { color: theme.countText, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.countBg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.count}
                 </Text>
-                {/* Ges. Zelle (Royalblau) */}
                 <Text style={[styles.orderTextBold, { color: theme.totalText, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.totalBg, paddingVertical: 4, borderRadius: 4, marginHorizontal: 2 }]}>
                   {item.totalQuantity}
                 </Text>
-                {/* 3M Zelle (Rot) */}
                 <Text style={[styles.orderTextBold, { color: theme.m3Text, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m3Bg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.m3}
                 </Text>
-                {/* 6M Zelle (Grün) */}
                 <Text style={[styles.orderTextBold, { color: theme.m6Text, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m6Bg, paddingVertical: 4, borderRadius: 4, marginHorizontal: 2 }]}>
                   {item.m6}
                 </Text>
-                {/* 12M Zelle (Türkis) */}
                 <Text style={[styles.orderTextBold, { color: theme.m12Text, flex: 1.1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m12Bg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.m12}
                 </Text>
@@ -736,7 +751,7 @@ export default function App() {
           <View style={[styles.card, { backgroundColor: theme.card }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>📖 Benutzerhandbuch</Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
-              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bestellungen erfassen:</Text> Gib den Namen ein und drücke Enter, um zum Datumsfeld zu springen. Nach Eingabe der Stückzahl speichert ein weiterer Druck auf Enter die Bestellung automatisch.
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bestellungen erfassen:</Text> Gib den Namen ein und drücke Enter, um zum Datumsfeld zu springen. Bekannte Namen werden während der Eingabe als Vorschlag angezeigt.
             </Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Datumsformat:</Text> Gib das Datum 8-stellig ein (z.B. 22062026 für den 22.06.2026). Es wird automatisch formatiert.
@@ -745,7 +760,7 @@ export default function App() {
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bearbeiten & Löschen:</Text> Nutze die Symbole neben den Einträgen. Das Löschen erfordert eine Sicherheitsbestätigung.
             </Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 4 }]}>
-              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> 3M (Rot), 6M (Grün) und 12M (Türkis) besitzen nun klare, unterscheidbare Farben. Alle Spalten sind klickbar zum Sortieren.
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> Alle Spalten sind farblich getrennt und klickbar zum Sortieren. Per Klick auf einen Mitarbeiter öffnet sich seine Historie.
             </Text>
           </View>
 
@@ -844,6 +859,26 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 10,
     marginBottom: 10,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 48,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: 6,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    maxHeight: 150,
+    zIndex: 1000,
+  },
+  suggestionItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
   },
   button: {
     backgroundColor: '#003366',
