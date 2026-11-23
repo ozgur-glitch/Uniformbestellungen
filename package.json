@@ -1,6 +1,6 @@
 {
   "name": "uniformbestellungen",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
