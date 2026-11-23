@@ -371,10 +371,14 @@ export default function App() {
     totalText: darkMode ? '#3b82f6' : '#1d4ed8',
     m3Bg: darkMode ? '#4c0519' : '#ffe4e6',
     m3Text: darkMode ? '#fb7185' : '#e11d48',
-    m6Bg: darkMode ? '#450a0a' : '#fee2e2',
-    m6Text: darkMode ? '#f87171' : '#991b1b',
-    m12Bg: darkMode ? '#083344' : '#cffafe',
-    m12Text: darkMode ? '#22d3ee' : '#0e7490',
+    
+    // 6M bekommt nun Türkis / Cyan (zuvor 12M)
+    m6Bg: darkMode ? '#083344' : '#cffafe',
+    m6Text: darkMode ? '#22d3ee' : '#0e7490',
+
+    // 12M bekommt nun Klares Grün (zuvor 6M)
+    m12Bg: darkMode ? '#022c22' : '#d1fae5',
+    m12Text: darkMode ? '#34d399' : '#047857',
 
     modalOverlay: 'rgba(0,0,0,0.5)',
     actionBg: darkMode ? '#2a2a2a' : '#f0f2f5',
@@ -447,7 +451,7 @@ export default function App() {
                   blurOnSubmit={false}
                 />
 
-                {/* Autovervollständigungs-Vorschläge (im normalen Layoutfluss, damit sie nicht überlappen) */}
+                {/* Autovervollständigungs-Vorschläge */}
                 {getUniqueEmployeeSuggestions().length > 0 && (
                   <View style={[styles.suggestionsContainer, { backgroundColor: theme.suggestionBg, borderColor: theme.inputBorder }]}>
                     <Text style={{ fontSize: 11, color: theme.subText, marginBottom: 4, fontWeight: 'bold' }}>Vorschläge:</Text>
@@ -635,12 +639,14 @@ export default function App() {
               </Text>
             </TouchableOpacity>
 
+            {/* 6M Header (Türkis) */}
             <TouchableOpacity style={{ flex: 1, alignItems: 'center', backgroundColor: theme.m6Bg, paddingVertical: 2, borderRadius: 4, marginHorizontal: 2 }} onPress={() => handleStatHeaderPress('m6')}>
               <Text style={{ color: theme.m6Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 6M{renderSortIndicator('m6')}
               </Text>
             </TouchableOpacity>
 
+            {/* 12M Header (Grün) */}
             <TouchableOpacity style={{ flex: 1.1, alignItems: 'center', backgroundColor: theme.m12Bg, paddingVertical: 2, borderRadius: 4 }} onPress={() => handleStatHeaderPress('m12')}>
               <Text style={{ color: theme.m12Text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
                 12M{renderSortIndicator('m12')}
@@ -671,9 +677,11 @@ export default function App() {
                 <Text style={[styles.orderTextBold, { color: theme.m3Text, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m3Bg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.m3}
                 </Text>
+                {/* 6M Zelle (Türkis) */}
                 <Text style={[styles.orderTextBold, { color: theme.m6Text, flex: 1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m6Bg, paddingVertical: 4, borderRadius: 4, marginHorizontal: 2 }]}>
                   {item.m6}
                 </Text>
+                {/* 12M Zelle (Grün) */}
                 <Text style={[styles.orderTextBold, { color: theme.m12Text, flex: 1.1, textAlign: 'center', fontSize: 12, backgroundColor: theme.m12Bg, paddingVertical: 4, borderRadius: 4 }]}>
                   {item.m12}
                 </Text>
@@ -750,7 +758,7 @@ export default function App() {
           <View style={[styles.card, { backgroundColor: theme.card }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>📖 Benutzerhandbuch</Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
-              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bestellungen erfassen:</Text> Gib den Namen ein und drücke Enter, um zum Datumsfeld zu springen. Bekannte Namen werden während der Eingabe direkt darunter als saubere Vorschlagsliste angezeigt.
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bestellungen erfassen:</Text> Gib den Namen ein und drücke Enter, um zum Datumsfeld zu springen. Bekannte Namen werden während der Eingabe als Vorschlag angezeigt.
             </Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Datumsformat:</Text> Gib das Datum 8-stellig ein (z.B. 22062026 für den 22.06.2026). Es wird automatisch formatiert.
@@ -759,7 +767,7 @@ export default function App() {
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bearbeiten & Löschen:</Text> Nutze die Symbole neben den Einträgen. Das Löschen erfordert eine Sicherheitsbestätigung.
             </Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 4 }]}>
-              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> Alle Spalten sind farblich getrennt und klickbar zum Sortieren. Per Klick auf einen Mitarbeiter öffnet sich seine Historie.
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> 3M (Rot), 6M (Türkis) und 12M (Grün) besitzen klare, unterscheidbare Farben. Alle Spalten sind klickbar zum Sortieren.
             </Text>
           </View>
 
