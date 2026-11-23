@@ -378,7 +378,7 @@ export default function App() {
 
     modalOverlay: 'rgba(0,0,0,0.5)',
     actionBg: darkMode ? '#2a2a2a' : '#f0f2f5',
-    suggestionBg: darkMode ? '#252a34' : '#ffffff',
+    suggestionBg: darkMode ? '#252a34' : '#f8f9fa',
   };
 
   const renderSortIndicator = (field) => {
@@ -436,36 +436,35 @@ export default function App() {
                   {editingId ? 'Bestellung bearbeiten' : 'Neue Bestellung'}
                 </Text>
                 
-                <View style={{ position: 'relative', zIndex: 10 }}>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-                    placeholder="Mitarbeiter Name"
-                    placeholderTextColor={theme.subText}
-                    value={name}
-                    onChangeText={setName}
-                    returnKeyType="next"
-                    onSubmitEditing={() => dateInputRef.current?.focus()}
-                    blurOnSubmit={false}
-                  />
+                <TextInput
+                  style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
+                  placeholder="Mitarbeiter Name"
+                  placeholderTextColor={theme.subText}
+                  value={name}
+                  onChangeText={setName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => dateInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                />
 
-                  {/* Autovervollständigungs-Vorschläge */}
-                  {getUniqueEmployeeSuggestions().length > 0 && (
-                    <View style={[styles.suggestionsContainer, { backgroundColor: theme.suggestionBg, borderColor: theme.inputBorder }]}>
-                      {getUniqueEmployeeSuggestions().map((suggestion, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.suggestionItem}
-                          onPress={() => {
-                            setName(suggestion);
-                            dateInputRef.current?.focus();
-                          }}
-                        >
-                          <Text style={{ color: theme.text, fontSize: 14 }}>👤 {suggestion}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                {/* Autovervollständigungs-Vorschläge (im normalen Layoutfluss, damit sie nicht überlappen) */}
+                {getUniqueEmployeeSuggestions().length > 0 && (
+                  <View style={[styles.suggestionsContainer, { backgroundColor: theme.suggestionBg, borderColor: theme.inputBorder }]}>
+                    <Text style={{ fontSize: 11, color: theme.subText, marginBottom: 4, fontWeight: 'bold' }}>Vorschläge:</Text>
+                    {getUniqueEmployeeSuggestions().map((suggestion, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[styles.suggestionItem, { borderBottomColor: theme.inputBorder }]}
+                        onPress={() => {
+                          setName(suggestion);
+                          dateInputRef.current?.focus();
+                        }}
+                      >
+                        <Text style={{ color: theme.text, fontSize: 13 }}>👤 {suggestion}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
                 <TextInput
                   ref={dateInputRef}
@@ -751,7 +750,7 @@ export default function App() {
           <View style={[styles.card, { backgroundColor: theme.card }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>📖 Benutzerhandbuch</Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
-              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bestellungen erfassen:</Text> Gib den Namen ein und drücke Enter, um zum Datumsfeld zu springen. Bekannte Namen werden während der Eingabe als Vorschlag angezeigt.
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bestellungen erfassen:</Text> Gib den Namen ein und drücke Enter, um zum Datumsfeld zu springen. Bekannte Namen werden während der Eingabe direkt darunter als saubere Vorschlagsliste angezeigt.
             </Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Datumsformat:</Text> Gib das Datum 8-stellig ein (z.B. 22062026 für den 22.06.2026). Es wird automatisch formatiert.
@@ -861,24 +860,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   suggestionsContainer: {
-    position: 'absolute',
-    top: 48,
-    left: 0,
-    right: 0,
     borderWidth: 1,
     borderRadius: 6,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    maxHeight: 150,
-    zIndex: 1000,
+    marginBottom: 10,
+    maxHeight: 140,
+    overflow: 'hidden',
   },
   suggestionItem: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(150,150,150,0.2)',
   },
   button: {
     backgroundColor: '#003366',
