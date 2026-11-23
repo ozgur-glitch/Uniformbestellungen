@@ -237,6 +237,20 @@ export default function App() {
     }
   };
 
+  const calculatePeriodQuantity = (employeeOrders, months) => {
+    const now = new Date();
+    const cutoffDate = new Date(now);
+    cutoffDate.setMonth(cutoffDate.getMonth() - months);
+
+    return employeeOrders.reduce((total, order) => {
+      const orderDate = parseDate(order.date);
+      if (orderDate >= cutoffDate && orderDate <= now) {
+        return total + (parseInt(order.quantity) || 1);
+      }
+      return total;
+    }, 0);
+  };
+
   const getStatistics = () => {
     const startDateObj = parseRawInputDate(statStartDate);
     const endDateObj = parseRawInputDate(statEndDate);
@@ -254,6 +268,14 @@ export default function App() {
     });
 
     const statsMap = {};
+    const employeeAllOrders = {};
+
+    orders.forEach(order => {
+      const emp = order.name;
+      if (!employeeAllOrders[emp]) employeeAllOrders[emp] = [];
+      employeeAllOrders[emp].push(order);
+    });
+
     filteredOrders.forEach(order => {
       const employee = order.name;
       const q = parseInt(order.quantity) || 1;
@@ -271,12 +293,18 @@ export default function App() {
       statsMap[employee].totalQuantity += q;
     });
 
-    const statsArray = Object.keys(statsMap).map(employee => ({
-      name: employee,
-      count: statsMap[employee].count,
-      totalQuantity: statsMap[employee].totalQuantity,
-      lastOrderDate: statsMap[employee].lastOrderDate
-    }));
+    const statsArray = Object.keys(statsMap).map(employee => {
+      const empOrders = employeeAllOrders[employee] || [];
+      return {
+        name: employee,
+        count: statsMap[employee].count,
+        totalQuantity: statsMap[employee].totalQuantity,
+        m3: calculatePeriodQuantity(empOrders, 3),
+        m6: calculatePeriodQuantity(empOrders, 6),
+        m12: calculatePeriodQuantity(empOrders, 12),
+        lastOrderDate: statsMap[employee].lastOrderDate
+      };
+    });
 
     return statsArray.sort((a, b) => {
       let comparison = 0;
@@ -284,8 +312,14 @@ export default function App() {
         comparison = a.name.localeCompare(b.name);
       } else if (statSortField === 'totalQuantity') {
         comparison = a.totalQuantity - b.totalQuantity;
-      } else {
+      } else if (statSortField === 'count') {
         comparison = a.count - b.count;
+      } else if (statSortField === 'm3') {
+        comparison = a.m3 - b.m3;
+      } else if (statSortField === 'm6') {
+        comparison = a.m6 - b.m6;
+      } else if (statSortField === 'm12') {
+        comparison = a.m12 - b.m12;
       }
       return statSortDirection === 'asc' ? comparison : -comparison;
     });
@@ -463,7 +497,6 @@ export default function App() {
                   <Text style={[styles.dateText, { color: theme.subText }]}>Stückzahl: {item.quantity}</Text>
                 )}
               </View>
-              {/* Action-Buttons mit Sicherheitsabfrage beim Löschen */}
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 <TouchableOpacity 
                   style={[styles.actionBtn, { backgroundColor: theme.actionBg }]} 
@@ -490,7 +523,7 @@ export default function App() {
       {activeTab === 'stats' && (
         <View style={{ flex: 1, padding: 10 }}>
           {/* Filter für Statistiken */}
-          <View style={[styles.card, { backgroundColor: theme.card, marginBottom: 10 }]}>
+          <View style={[styles.card, { backgroundColor: theme.card, marginBottom: 8 }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Statistiken filtern</Text>
             
             <TextInput
@@ -524,7 +557,7 @@ export default function App() {
             </View>
             {(statStartDate !== '' || statEndDate !== '' || statSearchQuery !== '') && (
               <TouchableOpacity 
-                style={{ marginTop: 8, alignSelf: 'flex-end' }}
+                style={{ marginTop: 6, alignSelf: 'flex-end' }}
                 onPress={() => { setStatStartDate(''); setStatEndDate(''); setStatSearchQuery(''); }}
               >
                 <Text style={{ color: '#dc3545', fontSize: 12, fontWeight: 'bold' }}>Filter zurücksetzen</Text>
@@ -532,23 +565,41 @@ export default function App() {
             )}
           </View>
 
-          {/* Interaktive Überschriftenzeile als Tabellen-Header */}
-          <View style={{ flexDirection: 'row', paddingHorizontal: 22, paddingVertical: 12, alignItems: 'center' }}>
-            <TouchableOpacity style={{ flex: 1 }} onPress={() => handleStatHeaderPress('name')}>
-              <Text style={{ color: theme.text, fontSize: 13, fontWeight: 'bold' }} numberOfLines={1}>
+          {/* Tabellen-Header (Exakt auf 100% Breite optimiert ohne horizontales Scrollen) */}
+          <View style={[styles.statHeaderRow, { backgroundColor: theme.card }]}>
+            <TouchableOpacity style={{ flex: 2.2 }} onPress={() => handleStatHeaderPress('name')}>
+              <Text style={{ color: theme.text, fontSize: 11, fontWeight: 'bold' }} numberOfLines={1}>
                 Mitarbeiter{renderSortIndicator('name')}
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={{ width: 100 }} onPress={() => handleStatHeaderPress('count')}>
-              <Text style={{ color: theme.text, fontSize: 13, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
-                Bestellungen{renderSortIndicator('count')}
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('count')}>
+              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                Best.{renderSortIndicator('count')}
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={{ width: 100 }} onPress={() => handleStatHeaderPress('totalQuantity')}>
-              <Text style={{ color: theme.text, fontSize: 13, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
-                Stückzahl{renderSortIndicator('totalQuantity')}
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('totalQuantity')}>
+              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                Ges.{renderSortIndicator('totalQuantity')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('m3')}>
+              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                3M{renderSortIndicator('m3')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ flex: 1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('m6')}>
+              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                6M{renderSortIndicator('m6')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ flex: 1.1, alignItems: 'center' }} onPress={() => handleStatHeaderPress('m12')}>
+              <Text style={{ color: theme.text, fontSize: 11, textAlign: 'center', fontWeight: 'bold' }} numberOfLines={1}>
+                12M{renderSortIndicator('m12')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -558,20 +609,29 @@ export default function App() {
             keyExtractor={(item) => item.name}
             renderItem={({ item }) => (
               <TouchableOpacity 
-                style={[styles.orderCard, { backgroundColor: theme.card, flexDirection: 'row', alignItems: 'center' }]}
+                style={[styles.statItemRow, { backgroundColor: theme.card }]}
                 onPress={() => setSelectedEmployee(item.name)}
               >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.orderTextBold, { color: theme.text }]} numberOfLines={1}>
+                <View style={{ flex: 2.2 }}>
+                  <Text style={[styles.orderTextBold, { color: theme.text, fontSize: 12 }]} numberOfLines={1}>
                     {item.name}
                   </Text>
                 </View>
                 
-                <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 100, textAlign: 'center', fontSize: 14 }]}>
+                <Text style={[styles.orderTextBold, { color: theme.statNumber, flex: 1, textAlign: 'center', fontSize: 12 }]}>
                   {item.count}
                 </Text>
-                <Text style={[styles.orderTextBold, { color: theme.statNumber, fontWeight: 'bold', width: 100, textAlign: 'center', fontSize: 14 }]}>
+                <Text style={[styles.orderTextBold, { color: theme.statNumber, flex: 1, textAlign: 'center', fontSize: 12 }]}>
                   {item.totalQuantity}
+                </Text>
+                <Text style={[styles.orderTextBold, { color: theme.subText, flex: 1, textAlign: 'center', fontSize: 12 }]}>
+                  {item.m3}
+                </Text>
+                <Text style={[styles.orderTextBold, { color: theme.subText, flex: 1, textAlign: 'center', fontSize: 12 }]}>
+                  {item.m6}
+                </Text>
+                <Text style={[styles.orderTextBold, { color: theme.subText, flex: 1.1, textAlign: 'center', fontSize: 12 }]}>
+                  {item.m12}
                 </Text>
               </TouchableOpacity>
             )}
@@ -604,14 +664,14 @@ export default function App() {
               {selectedEmployee}
             </Text>
 
-            <Text style={[styles.sectionSubtitle, { color: theme.subText }]}>
+            <Text style={[styles.sectionSubtitle, { color: theme.subText, marginTop: 4 }]}>
               Bestellhistorie ({getEmployeeHistory(selectedEmployee).length} Einträge):
             </Text>
 
             <FlatList
               data={getEmployeeHistory(selectedEmployee)}
               keyExtractor={(item) => item.id}
-              style={{ maxHeight: 300, marginVertical: 10 }}
+              style={{ maxHeight: 260, marginVertical: 6 }}
               renderItem={({ item }) => (
                 <View style={[styles.historyItem, { borderColor: theme.inputBorder }]}>
                   <Text style={[styles.historyText, { color: theme.text, flex: 1 }]}>
@@ -655,7 +715,7 @@ export default function App() {
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bearbeiten & Löschen:</Text> Nutze die Symbole neben den Einträgen. Das Löschen erfordert eine Sicherheitsbestätigung.
             </Text>
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 4 }]}>
-              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> Im Statistik-Tab kannst du nach Namen oder Zeiträumen filtern und per Klick auf einen Mitarbeiter dessen Detailhistorie einsehen.
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> Im Statistik-Tab siehst du Stückzahlen direkt übersichtlich nach 3, 6 und 12 Monaten in einer Tabelle ohne Scrollen. Alle Spalten sind klickbar zum Sortieren. Per Klick auf einen Mitarbeiter öffnet sich seine Historie.
             </Text>
           </View>
 
@@ -794,6 +854,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 1,
   },
+  statHeaderRow: {
+    flexDirection: 'row',
+    marginHorizontal: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  statItemRow: {
+    marginHorizontal: 10,
+    marginVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 1,
+  },
   orderTextBold: {
     fontWeight: 'bold',
     fontSize: 15,
@@ -860,17 +939,17 @@ const styles = StyleSheet.create({
   employeeName: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginVertical: 8,
+    marginVertical: 4,
   },
   sectionSubtitle: {
     fontSize: 13,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   historyItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 5,
     borderBottomWidth: 1,
   },
