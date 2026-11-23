@@ -11,9 +11,26 @@ import {
   Keyboard,
   ScrollView,
   StatusBar,
-  Modal
+  Modal,
+  Platform,
+  Share
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+let FileSystem = null;
+let DocumentPicker = null;
+
+try {
+  FileSystem = require('expo-file-system');
+} catch (e) {
+  console.log('expo-file-system ist nicht verfügbar.');
+}
+
+try {
+  DocumentPicker = require('expo-document-picker');
+} catch (e) {
+  console.log('expo-document-picker ist nicht verfügbar.');
+}
 
 const STORAGE_KEY = '@uniform_orders_key';
 
@@ -48,7 +65,6 @@ export default function App() {
 
   // UI-States
   const [darkMode, setDarkMode] = useState(false);
-  const [backupText, setBackupText] = useState('');
   const [activeTab, setActiveTab] = useState('orders'); 
 
   useEffect(() => {
@@ -210,32 +226,103 @@ export default function App() {
     }
   };
 
-  const generateBackupString = () => {
-    if (orders.length === 0) {
-      Alert.alert('Hinweis', 'Keine Daten zum Exportieren vorhanden.');
-      return;
+  // Backup Exportieren (JSON-Datei)
+  const exportBackup = async () => {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const stores = await AsyncStorage.multiGet(allKeys);
+      const backupData = {};
+
+      stores.forEach(([key, value]) => {
+        try {
+          backupData[key] = JSON.parse(value);
+        } catch {
+          backupData[key] = value;
+        }
+      });
+
+      const jsonString = JSON.stringify(backupData, null, 2);
+      const fileName = `Uniformen_Backup_${Date.now()}.json`;
+
+      if (Platform.OS === 'android' && FileSystem && FileSystem.StorageAccessFramework) {
+        const permissions =
+          await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (permissions.granted) {
+          const uri = await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            fileName,
+            'application/json'
+          );
+          await FileSystem.writeAsStringAsync(uri, jsonString, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          Alert.alert('Erfolg', 'Backup gespeichert!');
+        }
+      } else if (FileSystem && FileSystem.documentDirectory) {
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(fileUri, jsonString, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        Alert.alert('Backup Erstellt', `Gespeichert unter:\n${fileUri}`);
+      } else {
+        await Share.share({ message: jsonString, title: fileName });
+      }
+    } catch (err) {
+      Alert.alert('Export Fehler', err.message);
     }
-    setBackupText(JSON.stringify(orders));
-    Alert.alert('Backup generiert', 'Kopiere den Text aus dem grauen Feld unten manuell, um ihn zu sichern.');
   };
 
-  const importBackupString = async () => {
-    if (!backupText.trim()) {
-      Alert.alert('Fehler', 'Bitte füge zuerst einen gültigen Backup-String in das Feld ein.');
+  // Backup Wiederherstellen (JSON-Datei)
+  const importBackup = async () => {
+    if (!DocumentPicker) {
+      Alert.alert('Fehler', 'Document Picker nicht verfügbar.');
       return;
     }
+
     try {
-      const parsed = JSON.parse(backupText);
-      if (Array.isArray(parsed)) {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-        setOrders(parsed);
-        Alert.alert('Erfolg', 'Backup erfolgreich eingespielt!');
-        setBackupText('');
-      } else {
-        Alert.alert('Fehler', 'Ungültiges Backup-Format.');
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const fileUri = result.assets[0].uri;
+      let content = '';
+
+      if (FileSystem) {
+        content = await FileSystem.readAsStringAsync(fileUri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
       }
-    } catch (e) {
-      Alert.alert('Fehler', 'Der eingegebene Text ist kein gültiges Backup.');
+
+      const parsedData = JSON.parse(content);
+
+      Alert.alert(
+        'Wiederherstellung',
+        'Möchtest du alle Daten überschreiben?',
+        [
+          { text: 'Abbrechen', style: 'cancel' },
+          {
+            text: 'Überschreiben',
+            style: 'destructive',
+            onPress: async () => {
+              if (Array.isArray(parsedData)) {
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsedData));
+              } else {
+                for (const [key, value] of Object.entries(parsedData)) {
+                  const strValue = typeof value === 'string' ? value : JSON.stringify(value);
+                  await AsyncStorage.setItem(key, strValue);
+                }
+              }
+              await loadOrders();
+              Alert.alert('Erfolg', 'Daten wiederhergestellt!');
+            },
+          },
+        ]
+      );
+    } catch (err) {
+      Alert.alert('Import Fehler', err.message);
     }
   };
 
@@ -372,11 +459,11 @@ export default function App() {
     m3Bg: darkMode ? '#4c0519' : '#ffe4e6',
     m3Text: darkMode ? '#fb7185' : '#e11d48',
     
-    // 6M bekommt nun Türkis / Cyan (zuvor 12M)
+    // 6M: Türkis / Cyan
     m6Bg: darkMode ? '#083344' : '#cffafe',
     m6Text: darkMode ? '#22d3ee' : '#0e7490',
 
-    // 12M bekommt nun Klares Grün (zuvor 6M)
+    // 12M: Klares Grün
     m12Bg: darkMode ? '#022c22' : '#d1fae5',
     m12Text: darkMode ? '#34d399' : '#047857',
 
@@ -454,7 +541,7 @@ export default function App() {
                 {/* Autovervollständigungs-Vorschläge */}
                 {getUniqueEmployeeSuggestions().length > 0 && (
                   <View style={[styles.suggestionsContainer, { backgroundColor: theme.suggestionBg, borderColor: theme.inputBorder }]}>
-                    <Text style={{ fontSize: 11, color: theme.subText, marginBottom: 4, fontWeight: 'bold' }}>Vorschläge:</Text>
+                    <Text style={{ fontSize: 11, color: theme.subText, marginBottom: 4, paddingHorizontal: 12, paddingTop: 6, fontWeight: 'bold' }}>Vorschläge:</Text>
                     {getUniqueEmployeeSuggestions().map((suggestion, index) => (
                       <TouchableOpacity
                         key={index}
@@ -712,7 +799,7 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.employeeName, { color: theme.statNumber }]}>
+            <Text style={[styles.employeeName, { color: theme.text }]}>
               {selectedEmployee}
             </Text>
 
@@ -754,6 +841,38 @@ export default function App() {
       {/* INHALT: TAB BACKUP */}
       {activeTab === 'backup' && (
         <ScrollView style={{ padding: 10 }}>
+          {/* Daten-Backup (JSON Export / Import) */}
+          <View style={[styles.card, { backgroundColor: theme.card }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>DATEN-BACKUP</Text>
+            <Text style={[styles.orderText, { color: theme.subText, marginBottom: 15 }]}>
+              Sichere alle Bestellungen als JSON-Datei auf deinem Gerät oder stelle einen vorherigen Stand wieder her.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.backupOutlineButton,
+                { backgroundColor: 'transparent', borderColor: theme.inputBorder },
+              ]}
+              onPress={exportBackup}
+            >
+              <Text style={[styles.backupOutlineButtonText, { color: theme.text }]}>
+                💾 Backup Exportieren (JSON)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.backupOutlineButton,
+                { backgroundColor: 'transparent', borderColor: theme.inputBorder, marginBottom: 0 },
+              ]}
+              onPress={importBackup}
+            >
+              <Text style={[styles.backupOutlineButtonText, { color: theme.text }]}>
+                📥 Backup Wiederherstellen
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Benutzerhandbuch / Anleitung */}
           <View style={[styles.card, { backgroundColor: theme.card }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>📖 Benutzerhandbuch</Text>
@@ -766,37 +885,16 @@ export default function App() {
             <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Bearbeiten & Löschen:</Text> Nutze die Symbole neben den Einträgen. Das Löschen erfordert eine Sicherheitsbestätigung.
             </Text>
-            <Text style={[styles.devText, { color: theme.subText, marginBottom: 4 }]}>
+            <Text style={[styles.devText, { color: theme.subText, marginBottom: 8 }]}>
               • <Text style={{ fontWeight: 'bold', color: theme.text }}>Statistiken & Profile:</Text> 3M (Rot), 6M (Türkis) und 12M (Grün) besitzen klare, unterscheidbare Farben. Alle Spalten sind klickbar zum Sortieren.
             </Text>
-          </View>
-
-          <View style={[styles.card, { backgroundColor: theme.card }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Daten Sichern & Wiederherstellen</Text>
-            <Text style={[styles.orderText, { color: theme.subText, marginBottom: 15 }]}>
-              Generiere ein Backup, markiere den Text im Feld lange und kopiere ihn zur externen Sicherung. Zum Einspielen fügst du deinen alten Code hier ein.
+            <Text style={[styles.devText, { color: theme.subText, marginBottom: 4 }]}>
+              • <Text style={{ fontWeight: 'bold', color: theme.text }}>Daten-Backup:</Text> Exportiere deine Daten als JSON-Datei und importiere sie bei Bedarf wieder.
             </Text>
-            
-            <TouchableOpacity style={[styles.button, { marginBottom: 10 }]} onPress={generateBackupString}>
-              <Text style={styles.buttonText}>Backup-Code generieren</Text>
-            </TouchableOpacity>
-
-            <TextInput
-              style={[styles.input, { height: 120, textAlignVertical: 'top', backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.text }]}
-              multiline
-              placeholder="Füge hier den Backup-String ein oder kopiere ihn heraus..."
-              placeholderTextColor={theme.subText}
-              value={backupText}
-              onChangeText={setBackupText}
-            />
-
-            <TouchableOpacity style={[styles.button, { backgroundColor: '#28a745' }]} onPress={importBackupString}>
-              <Text style={styles.buttonText}>Backup einspielen</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Entwicklerinformationen Box */}
-          <View style={[styles.card, { backgroundColor: theme.card, marginTop: 5, padding: 12 }]}>
+          <View style={[styles.card, { backgroundColor: theme.card, marginTop: 5, padding: 12, marginBottom: 25 }]}>
             <Text style={[styles.devTitle, { color: theme.text }]}>Entwickler-Informationen</Text>
             <Text style={[styles.devText, { color: theme.subText }]}>Entwickler: Özgür Cetin</Text>
             <Text style={[styles.devText, { color: theme.subText }]}>E-Mail: ozgur.cetin@web.de</Text>
@@ -889,6 +987,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  backupOutlineButton: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  backupOutlineButtonText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -970,7 +1079,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  // Modal & Profil Styles
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
